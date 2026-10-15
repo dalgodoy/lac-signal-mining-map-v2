@@ -75,7 +75,8 @@ export const DirectoryPage: React.FC<DirectoryPageProps> = ({
       });
   }, [initiatives, searchTerm, selectedCountryCodes, selectedCategory, sortBy]);
 
-  const hasActiveFilters = searchTerm !== '' || selectedCountryCodes.length > 0 || selectedCategory !== 'all';
+  const isAllCountries = selectedCountryCodes.length === 0 || selectedCountryCodes.length >= 11;
+  const hasActiveFilters = searchTerm !== '' || !isAllCountries || selectedCategory !== 'all';
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 min-h-0">

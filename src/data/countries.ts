@@ -270,3 +270,24 @@ export function matchesSelectedCountries(countryName: string, selectedCodes: str
   const code = countryNameToCode(countryName);
   return selectedCodes.includes(code);
 }
+
+/**
+ * Standard country codes present in the default community dataset.
+ */
+export const DEFAULT_COMMUNITY_COUNTRY_CODES: string[] = [
+  'AR', 'BO', 'BR', 'CB', 'CL', 'CO', 'CR', 'LAC', 'MX', 'PE', 'VE'
+];
+
+/**
+ * Extract unique country codes from any list of initiatives.
+ */
+export function extractUniqueCountryCodes(items: { country?: string }[]): string[] {
+  const codes = new Set<string>();
+  items.forEach((item) => {
+    if (item.country && item.country.trim()) {
+      codes.add(countryNameToCode(item.country.trim()));
+    }
+  });
+  return Array.from(codes);
+}
+

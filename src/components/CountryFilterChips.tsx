@@ -52,12 +52,30 @@ export const CountryFilterChips: React.FC<CountryFilterChipsProps> = ({
 
   const allAvailableCodes = useMemo(() => countryList.map((c) => c.info.code), [countryList]);
 
+  const isAllSelected = 
+    selectedCodes.length === 0 || 
+    (allAvailableCodes.length > 0 && allAvailableCodes.every((c) => selectedCodes.includes(c)));
+
   // Toggle an individual country chip
   const handleToggleCountry = (code: string) => {
+    // If all countries are currently active ("All" default state),
+    // clicking a single chip focuses exclusively on that country!
+    if (isAllSelected) {
+      onChange([code]);
+      return;
+    }
+
     if (selectedCodes.includes(code)) {
-      onChange(selectedCodes.filter((c) => c !== code));
+      const next = selectedCodes.filter((c) => c !== code);
+      // If user deselects the only remaining country, return back to "All"
+      if (next.length === 0) {
+        onChange([...allAvailableCodes]);
+      } else {
+        onChange(next);
+      }
     } else {
-      onChange([...selectedCodes, code]);
+      const next = [...selectedCodes, code];
+      onChange(next);
     }
   };
 
@@ -66,9 +84,9 @@ export const CountryFilterChips: React.FC<CountryFilterChipsProps> = ({
     onChange([...allAvailableCodes]);
   };
 
-  // "Clear" button: resets selection to empty (showing all countries)
+  // "Clear" button: resets selection back to "All"
   const handleClear = () => {
-    onChange([]);
+    onChange([...allAvailableCodes]);
   };
 
   // Sub-region preset selection
@@ -78,13 +96,14 @@ export const CountryFilterChips: React.FC<CountryFilterChipsProps> = ({
     
     // Check if preset is already fully selected
     const isAlreadyFullySelected = 
+      !isAllSelected &&
       matchingInDataset.length > 0 &&
       matchingInDataset.every((code) => selectedCodes.includes(code)) &&
       selectedCodes.length === matchingInDataset.length;
 
     if (isAlreadyFullySelected) {
-      // Toggle off preset if clicked again
-      onChange([]);
+      // Toggle off preset if clicked again -> return to "All"
+      onChange([...allAvailableCodes]);
     } else {
       onChange(matchingInDataset);
     }
@@ -100,11 +119,6 @@ export const CountryFilterChips: React.FC<CountryFilterChipsProps> = ({
     });
   };
 
-  const isFiltered = selectedCodes.length > 0;
-  const isAllExplicitlySelected = 
-    selectedCodes.length > 0 && 
-    allAvailableCodes.every((c) => selectedCodes.includes(c));
-
   return (
     <div className="space-y-2.5">
       {/* Header and Shortcuts Row */}
@@ -114,14 +128,13 @@ export const CountryFilterChips: React.FC<CountryFilterChipsProps> = ({
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               Country Filter
             </span>
-            {isFiltered && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">
-                {selectedCodes.length} active
+            {isAllSelected ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold">
+                All countries active ({allAvailableCodes.length})
               </span>
-            )}
-            {!isFiltered && (
-              <span className="text-[10px] text-slate-400 font-medium">
-                (showing all)
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">
+                {selectedCodes.length} of {allAvailableCodes.length} active
               </span>
             )}
           </div>
@@ -154,11 +167,11 @@ export const CountryFilterChips: React.FC<CountryFilterChipsProps> = ({
             type="button"
             onClick={handleSelectAll}
             className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              isAllExplicitlySelected
-                ? 'bg-indigo-600 text-white shadow-2xs'
+              isAllSelected
+                ? 'bg-indigo-600 text-white shadow-2xs ring-2 ring-indigo-200'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
-            title="Select all countries"
+            title="Select all countries (default view)"
           >
             All
           </button>
@@ -167,13 +180,13 @@ export const CountryFilterChips: React.FC<CountryFilterChipsProps> = ({
           <button
             type="button"
             onClick={handleClear}
-            disabled={!isFiltered}
+            disabled={isAllSelected}
             className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1 ${
-              isFiltered
+              !isAllSelected
                 ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold cursor-pointer'
                 : 'opacity-40 bg-slate-100 text-slate-400 cursor-not-allowed'
             }`}
-            title="Clear country filters (show all)"
+            title="Clear country filters (reset to All)"
           >
             <RotateCcw className="w-3 h-3" />
             <span>Clear</span>
@@ -187,6 +200,7 @@ export const CountryFilterChips: React.FC<CountryFilterChipsProps> = ({
             if (relevantPresetCodes.length === 0) return null;
 
             const isPresetActive =
+              !isAllSelected &&
               relevantPresetCodes.every((c) => selectedCodes.includes(c)) &&
               selectedCodes.length === relevantPresetCodes.length;
 
@@ -216,8 +230,8 @@ export const CountryFilterChips: React.FC<CountryFilterChipsProps> = ({
         }`}
       >
         {countryList.map(({ info, count }) => {
-          const isSelected = selectedCodes.includes(info.code);
-          const isDimmed = isFiltered && !isSelected;
+          const isSelected = isAllSelected || selectedCodes.includes(info.code);
+          const isDimmed = !isAllSelected && !selectedCodes.includes(info.code);
 
           return (
             <button
@@ -225,7 +239,7 @@ export const CountryFilterChips: React.FC<CountryFilterChipsProps> = ({
               type="button"
               onClick={() => handleToggleCountry(info.code)}
               title={`${info.name}: ${count} initiative${count === 1 ? '' : 's'}${
-                isSelected ? ' (Click to remove)' : ' (Click to select)'
+                !isAllSelected && isSelected ? ' (Click to remove)' : ' (Click to filter)'
               }`}
               className={`group relative inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs transition-all select-none cursor-pointer border ${
                 isSelected

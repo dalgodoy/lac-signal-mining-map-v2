@@ -19,7 +19,12 @@ import { InteractiveMap } from './components/InteractiveMap';
 import { InitiativeDetailModal } from './components/InitiativeDetailModal';
 import { DirectoryPage } from './pages/DirectoryPage';
 import { StatsPage } from './pages/StatsPage';
-import { countryNameToCode, matchesSelectedCountries } from './data/countries';
+import { 
+  countryNameToCode, 
+  matchesSelectedCountries, 
+  DEFAULT_COMMUNITY_COUNTRY_CODES,
+  extractUniqueCountryCodes 
+} from './data/countries';
 import { Menu, X } from 'lucide-react';
 
 const HASH_TO_PAGE: Record<string, PageView> = {
@@ -49,9 +54,9 @@ export default function App() {
     return 'map';
   };
 
-  // Parse shareable country selection (?c=BR,AR,CL) from URL
+  // Parse shareable country selection (?c=BR,AR,CL) from URL, default to "All"
   const getInitialCountryCodes = (): string[] => {
-    if (typeof window === 'undefined') return [];
+    if (typeof window === 'undefined') return DEFAULT_COMMUNITY_COUNTRY_CODES;
     try {
       // 1. Check standard query params (?c=...)
       const params = new URLSearchParams(window.location.search);
@@ -65,15 +70,24 @@ export default function App() {
       }
 
       if (cParam) {
-        return cParam
+        const cleanParam = cParam.trim().toUpperCase();
+        if (cleanParam === 'ALL') {
+          return DEFAULT_COMMUNITY_COUNTRY_CODES;
+        }
+        const codes = cleanParam
           .split(',')
           .map((code) => countryNameToCode(code.trim()))
           .filter(Boolean);
+
+        if (codes.length > 0) {
+          return codes;
+        }
       }
     } catch (e) {
       console.warn('Error parsing country query param from URL:', e);
     }
-    return [];
+    // Default: start with the "All" selection by default
+    return DEFAULT_COMMUNITY_COUNTRY_CODES;
   };
 
   const [activePage, setActivePage] = useState<PageView>(getInitialPage);
@@ -93,6 +107,7 @@ export default function App() {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
+  // Starts with "All" countries selected by default
   const [selectedCountryCodes, setSelectedCountryCodes] = useState<string[]>(getInitialCountryCodes);
   const [selectedCategory, setSelectedCategory] = useState('all');
   
@@ -106,7 +121,12 @@ export default function App() {
     if (typeof window === 'undefined') return;
     try {
       const url = new URL(window.location.href);
-      if (selectedCountryCodes.length > 0) {
+      const isAll = 
+        selectedCountryCodes.length === 0 || 
+        selectedCountryCodes.length >= DEFAULT_COMMUNITY_COUNTRY_CODES.length;
+
+      // Only set ?c= if a specific subset is selected, keeping default URL clean
+      if (!isAll && selectedCountryCodes.length > 0) {
         url.searchParams.set('c', selectedCountryCodes.join(','));
       } else {
         url.searchParams.delete('c');
@@ -273,6 +293,10 @@ export default function App() {
   // Filtered list
   const filteredInitiatives = useMemo(() => {
     const query = searchTerm.toLowerCase().trim();
+    const isAll = 
+      selectedCountryCodes.length === 0 || 
+      selectedCountryCodes.length >= DEFAULT_COMMUNITY_COUNTRY_CODES.length;
+
     return initiatives.filter((item) => {
       const matchesSearch =
         !query ||
@@ -283,7 +307,7 @@ export default function App() {
         (item.scope && item.scope.toLowerCase().includes(query)) ||
         (item.locationRaw && item.locationRaw.toLowerCase().includes(query));
 
-      const matchesCountry = matchesSelectedCountries(item.country, selectedCountryCodes);
+      const matchesCountry = isAll || matchesSelectedCountries(item.country, selectedCountryCodes);
       const matchesCategory =
         selectedCategory === 'all' || item.category.trim() === selectedCategory;
 
@@ -303,7 +327,7 @@ export default function App() {
 
   const handleResetFilters = () => {
     setSearchTerm('');
-    setSelectedCountryCodes([]);
+    setSelectedCountryCodes(DEFAULT_COMMUNITY_COUNTRY_CODES);
     setSelectedCategory('all');
   };
 
@@ -372,7 +396,7 @@ export default function App() {
                 }}
                 onResetView={() => {
                   setSelectedInitiative(null);
-                  setSelectedCountryCodes([]);
+                  setSelectedCountryCodes(DEFAULT_COMMUNITY_COUNTRY_CODES);
                 }}
               />
             </main>

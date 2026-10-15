@@ -54,7 +54,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Extract unique categories
   const categories = Array.from(new Set(initiatives.map((i) => i.category).filter(Boolean))).sort();
 
-  const hasActiveFilters = searchTerm !== '' || selectedCountryCodes.length > 0 || selectedCategory !== 'all';
+  const isAllCountries = selectedCountryCodes.length === 0 || selectedCountryCodes.length >= 11;
+  const hasActiveFilters = searchTerm !== '' || !isAllCountries || selectedCategory !== 'all';
 
   return (
     <aside

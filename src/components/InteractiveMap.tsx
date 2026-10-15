@@ -277,12 +277,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     const prevCodes = prevSelectedCodesRef.current;
     prevSelectedCodesRef.current = selectedCountryCodes;
 
-    // Skip initial mount if nothing is filtered
-    if (prevCodes === undefined && (!selectedCountryCodes || selectedCountryCodes.length === 0)) {
+    // Determine whether all countries are active
+    const isAll = !selectedCountryCodes || selectedCountryCodes.length === 0 || selectedCountryCodes.length >= 11;
+    const wasAll = prevCodes === undefined || prevCodes.length === 0 || prevCodes.length >= 11;
+
+    // Skip initial mount if in "All" view (default map view is already Latin America & Caribbean)
+    if (prevCodes === undefined && isAll) {
       return;
     }
 
-    if (selectedCountryCodes && selectedCountryCodes.length > 0) {
+    if (!isAll && selectedCountryCodes && selectedCountryCodes.length > 0) {
       const validCoords = initiatives
         .filter((i) => typeof i.lat === 'number' && typeof i.lng === 'number' && !isNaN(i.lat) && !isNaN(i.lng))
         .map((i) => [i.lat, i.lng] as [number, number]);
@@ -298,8 +302,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           duration: 1.0,
         });
       }
-    } else if (prevCodes && prevCodes.length > 0 && selectedCountryCodes?.length === 0) {
-      // Country selection cleared -> smoothly fly back to full regional overview
+    } else if (isAll && !wasAll) {
+      // Returned back to All -> smoothly fly back to full regional overview
       map.flyTo([-12.0, -65.0], 3.5, { duration: 1.0 });
     }
   }, [selectedCountryCodes, initiatives, selectedInitiative]);
