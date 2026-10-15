@@ -1,6 +1,7 @@
 import React from 'react';
 import { Initiative } from '../types';
 import { getCategoryStyle } from '../data/fallbackData';
+import { getCountryInfo } from '../data/countries';
 import { Globe, Award, PieChart, Layers } from 'lucide-react';
 
 interface StatsViewProps {
@@ -121,6 +122,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
         <div className="space-y-2">
           {sortedCountries.map(([country, count]) => {
             const percent = Math.round((count / total) * 100);
+            const countryInfo = getCountryInfo(country);
 
             return (
               <div
@@ -128,9 +130,15 @@ export const StatsView: React.FC<StatsViewProps> = ({
                 onClick={() => onSelectCountryFilter(country)}
                 className="p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all cursor-pointer flex items-center justify-between text-xs group"
               >
-                <span className="font-semibold text-slate-700 group-hover:text-indigo-600">
-                  {country}
-                </span>
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="text-sm leading-none shrink-0">{countryInfo.flag}</span>
+                  <span className="font-semibold text-slate-700 group-hover:text-indigo-600 truncate">
+                    {country}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">
+                    ({countryInfo.code})
+                  </span>
+                </div>
                 <div className="flex items-center gap-3">
                   <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
                     <div

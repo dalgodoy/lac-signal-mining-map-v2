@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { Initiative } from '../types';
 import { getCategoryStyle } from '../data/fallbackData';
+import { CountryFilterChips } from '../components/CountryFilterChips';
+import { getCountryInfo } from '../data/countries';
 import { 
   BarChart3, 
   Globe, 
@@ -15,6 +17,9 @@ import {
 
 interface StatsPageProps {
   initiatives: Initiative[];
+  allInitiatives: Initiative[];
+  selectedCountryCodes: string[];
+  onCountryCodesChange: (codes: string[]) => void;
   onFilterByCountry: (country: string) => void;
   onFilterByCategory: (category: string) => void;
   onGoToDirectory: () => void;
@@ -22,6 +27,9 @@ interface StatsPageProps {
 
 export const StatsPage: React.FC<StatsPageProps> = ({
   initiatives,
+  allInitiatives,
+  selectedCountryCodes,
+  onCountryCodesChange,
   onFilterByCountry,
   onFilterByCategory,
   onGoToDirectory,
@@ -104,6 +112,16 @@ export const StatsPage: React.FC<StatsPageProps> = ({
           <p className="text-sm text-slate-600 mt-1 max-w-2xl">
             Key ecosystem metrics: distribution by country, category breakdown, research schools, and scientific societies across the region.
           </p>
+        </div>
+
+        {/* Country Filter Chips in StatsPage */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <CountryFilterChips
+            initiatives={allInitiatives}
+            selectedCodes={selectedCountryCodes}
+            onChange={onCountryCodesChange}
+            variant="horizontal"
+          />
         </div>
 
         {/* Top 5 KPI Cards */}
@@ -245,15 +263,22 @@ export const StatsPage: React.FC<StatsPageProps> = ({
               <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
                 {stats.sortedCountries.map(([country, count]) => {
                   const percent = Math.round((count / total) * 100);
+                  const countryInfo = getCountryInfo(country);
                   return (
                     <div
                       key={country}
                       onClick={() => onFilterByCountry(country)}
                       className="p-2.5 hover:bg-slate-50 rounded-xl border border-transparent hover:border-slate-200 transition-all cursor-pointer flex items-center justify-between text-xs group"
                     >
-                      <span className="font-bold text-slate-700 group-hover:text-indigo-600">
-                        {country}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base leading-none">{countryInfo.flag}</span>
+                        <span className="font-bold text-slate-700 group-hover:text-indigo-600">
+                          {country}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">
+                          ({countryInfo.code})
+                        </span>
+                      </div>
                       <div className="flex items-center gap-3">
                         <div className="w-32 bg-slate-100 h-2 rounded-full overflow-hidden hidden sm:block">
                           <div

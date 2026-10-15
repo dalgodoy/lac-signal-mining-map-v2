@@ -8,6 +8,7 @@ import { RotateCcw, Layers, ZoomIn, ZoomOut, Check } from 'lucide-react';
 interface InteractiveMapProps {
   initiatives: Initiative[];
   selectedInitiative: Initiative | null;
+  selectedCountryCodes?: string[];
   onSelectInitiative: (init: Initiative) => void;
   onResetView: () => void;
 }
@@ -44,7 +45,9 @@ const MAP_THEMES: Record<
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   initiatives,
   selectedInitiative,
+  selectedCountryCodes,
   onSelectInitiative,
+  onResetView,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -262,8 +265,48 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   }, [selectedInitiative]);
 
+  // Zoom to fit bounds when selected country chips change
+  const prevSelectedCodesRef = useRef<string[] | undefined>(undefined);
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // If a specific initiative is highlighted, preserve focus on it
+    if (selectedInitiative) return;
+
+    const prevCodes = prevSelectedCodesRef.current;
+    prevSelectedCodesRef.current = selectedCountryCodes;
+
+    // Skip initial mount if nothing is filtered
+    if (prevCodes === undefined && (!selectedCountryCodes || selectedCountryCodes.length === 0)) {
+      return;
+    }
+
+    if (selectedCountryCodes && selectedCountryCodes.length > 0) {
+      const validCoords = initiatives
+        .filter((i) => typeof i.lat === 'number' && typeof i.lng === 'number' && !isNaN(i.lat) && !isNaN(i.lng))
+        .map((i) => [i.lat, i.lng] as [number, number]);
+
+      if (validCoords.length === 1) {
+        map.flyTo(validCoords[0], 6, { duration: 1.0 });
+      } else if (validCoords.length > 1) {
+        const bounds = L.latLngBounds(validCoords);
+        map.fitBounds(bounds, {
+          padding: [50, 50],
+          maxZoom: 7,
+          animate: true,
+          duration: 1.0,
+        });
+      }
+    } else if (prevCodes && prevCodes.length > 0 && selectedCountryCodes?.length === 0) {
+      // Country selection cleared -> smoothly fly back to full regional overview
+      map.flyTo([-12.0, -65.0], 3.5, { duration: 1.0 });
+    }
+  }, [selectedCountryCodes, initiatives, selectedInitiative]);
+
   const handleResetMap = () => {
     if (!mapInstanceRef.current) return;
+    onResetView();
     mapInstanceRef.current.flyTo([-12.0, -65.0], 3.5, { duration: 1.0 });
   };
 

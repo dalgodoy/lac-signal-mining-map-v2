@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Initiative, DataSourceState } from '../types';
 import { getCategoryStyle } from '../data/fallbackData';
 import { StatsView } from './StatsView';
+import { CountryFilterChips } from './CountryFilterChips';
+import { countryNameToCode } from '../data/countries';
 import { 
   Search, 
   MapPin, 
@@ -22,8 +24,8 @@ interface SidebarProps {
   onSelectInitiative: (initiative: Initiative) => void;
   searchTerm: string;
   onSearchChange: (val: string) => void;
-  selectedCountry: string;
-  onCountryChange: (val: string) => void;
+  selectedCountryCodes: string[];
+  onCountryCodesChange: (codes: string[]) => void;
   selectedCategory: string;
   onCategoryChange: (val: string) => void;
   onResetFilters: () => void;
@@ -39,8 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectInitiative,
   searchTerm,
   onSearchChange,
-  selectedCountry,
-  onCountryChange,
+  selectedCountryCodes,
+  onCountryCodesChange,
   selectedCategory,
   onCategoryChange,
   onResetFilters,
@@ -49,11 +51,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'stats'>('list');
 
-  // Extract unique countries and categories
-  const countries = Array.from(new Set(initiatives.map((i) => i.country).filter(Boolean))).sort();
+  // Extract unique categories
   const categories = Array.from(new Set(initiatives.map((i) => i.category).filter(Boolean))).sort();
 
-  const hasActiveFilters = searchTerm !== '' || selectedCountry !== 'all' || selectedCategory !== 'all';
+  const hasActiveFilters = searchTerm !== '' || selectedCountryCodes.length > 0 || selectedCategory !== 'all';
 
   return (
     <aside
@@ -83,43 +84,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Filter Dropdowns */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              Country / Region
-            </label>
-            <select
-              value={selectedCountry}
-              onChange={(e) => onCountryChange(e.target.value)}
-              className="w-full py-2 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 cursor-pointer"
-            >
-              <option value="all">All countries ({countries.length})</option>
-              {countries.map((country) => (
-                <option key={country} value={country}>
-                  {country}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Category Filter */}
+        <div>
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+            Category
+          </label>
+          <select
+            value={selectedCategory}
+            onChange={(e) => onCategoryChange(e.target.value)}
+            className="w-full py-2 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 cursor-pointer"
+          >
+            <option value="all">All categories ({categories.length})</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              Category
-            </label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => onCategoryChange(e.target.value)}
-              className="w-full py-2 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 cursor-pointer"
-            >
-              <option value="all">All categories</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Clickable Flag Chips Country Filter */}
+        <div className="pt-1 border-t border-slate-100">
+          <CountryFilterChips
+            initiatives={initiatives}
+            selectedCodes={selectedCountryCodes}
+            onChange={onCountryCodesChange}
+            variant="sidebar"
+          />
         </div>
 
         {/* Active Filters Reset Bar */}
@@ -133,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[11px] cursor-pointer"
             >
               <RotateCcw className="w-3 h-3" />
-              <span>Clear filters</span>
+              <span>Clear all filters</span>
             </button>
           </div>
         )}
@@ -319,7 +310,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <StatsView
             initiatives={filteredInitiatives}
             onSelectCountryFilter={(country) => {
-              onCountryChange(country);
+              const code = countryNameToCode(country);
+              onCountryCodesChange([code]);
               setActiveTab('list');
             }}
             onSelectCategoryFilter={(cat) => {

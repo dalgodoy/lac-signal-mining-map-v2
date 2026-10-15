@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Initiative } from '../types';
 import { getCategoryStyle } from '../data/fallbackData';
+import { CountryFilterChips } from '../components/CountryFilterChips';
+import { matchesSelectedCountries } from '../data/countries';
 import { 
   Search, 
   MapPin, 
@@ -18,8 +20,8 @@ interface DirectoryPageProps {
   initiatives: Initiative[];
   searchTerm: string;
   onSearchChange: (val: string) => void;
-  selectedCountry: string;
-  onCountryChange: (val: string) => void;
+  selectedCountryCodes: string[];
+  onCountryCodesChange: (codes: string[]) => void;
   selectedCategory: string;
   onCategoryChange: (val: string) => void;
   onResetFilters: () => void;
@@ -31,8 +33,8 @@ export const DirectoryPage: React.FC<DirectoryPageProps> = ({
   initiatives,
   searchTerm,
   onSearchChange,
-  selectedCountry,
-  onCountryChange,
+  selectedCountryCodes,
+  onCountryCodesChange,
   selectedCategory,
   onCategoryChange,
   onResetFilters,
@@ -41,11 +43,6 @@ export const DirectoryPage: React.FC<DirectoryPageProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [sortBy, setSortBy] = useState<'name' | 'country' | 'category'>('name');
-
-  // Unique lists for filter dropdowns
-  const countries = useMemo(() => {
-    return Array.from(new Set(initiatives.map((i) => i.country).filter(Boolean))).sort();
-  }, [initiatives]);
 
   const categories = useMemo(() => {
     return Array.from(new Set(initiatives.map((i) => i.category).filter(Boolean))).sort();
@@ -65,8 +62,7 @@ export const DirectoryPage: React.FC<DirectoryPageProps> = ({
           (item.scope && item.scope.toLowerCase().includes(query)) ||
           (item.locationRaw && item.locationRaw.toLowerCase().includes(query));
 
-        const matchesCountry =
-          selectedCountry === 'all' || item.country.trim() === selectedCountry;
+        const matchesCountry = matchesSelectedCountries(item.country, selectedCountryCodes);
         const matchesCategory =
           selectedCategory === 'all' || item.category.trim() === selectedCategory;
 
@@ -77,9 +73,9 @@ export const DirectoryPage: React.FC<DirectoryPageProps> = ({
         if (sortBy === 'category') return a.category.localeCompare(b.category);
         return a.name.localeCompare(b.name);
       });
-  }, [initiatives, searchTerm, selectedCountry, selectedCategory, sortBy]);
+  }, [initiatives, searchTerm, selectedCountryCodes, selectedCategory, sortBy]);
 
-  const hasActiveFilters = searchTerm !== '' || selectedCountry !== 'all' || selectedCategory !== 'all';
+  const hasActiveFilters = searchTerm !== '' || selectedCountryCodes.length > 0 || selectedCategory !== 'all';
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 min-h-0">
@@ -140,7 +136,7 @@ export const DirectoryPage: React.FC<DirectoryPageProps> = ({
 
         {/* Filter & Search Bar */}
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs mb-6 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {/* Search */}
             <div className="md:col-span-2 relative">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -151,22 +147,6 @@ export const DirectoryPage: React.FC<DirectoryPageProps> = ({
                 placeholder="Search by institution, topic, country..."
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
               />
-            </div>
-
-            {/* Country */}
-            <div>
-              <select
-                value={selectedCountry}
-                onChange={(e) => onCountryChange(e.target.value)}
-                className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 cursor-pointer"
-              >
-                <option value="all">All countries ({countries.length})</option>
-                {countries.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
             </div>
 
             {/* Category */}
@@ -184,6 +164,16 @@ export const DirectoryPage: React.FC<DirectoryPageProps> = ({
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Clickable Flag Chips Country Filter */}
+          <div className="pt-2 border-t border-slate-100">
+            <CountryFilterChips
+              initiatives={initiatives}
+              selectedCodes={selectedCountryCodes}
+              onChange={onCountryCodesChange}
+              variant="horizontal"
+            />
           </div>
 
           {/* Sub-bar: Sort & Reset */}

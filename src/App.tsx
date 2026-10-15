@@ -19,6 +19,7 @@ import { InteractiveMap } from './components/InteractiveMap';
 import { InitiativeDetailModal } from './components/InitiativeDetailModal';
 import { DirectoryPage } from './pages/DirectoryPage';
 import { StatsPage } from './pages/StatsPage';
+import { countryNameToCode, matchesSelectedCountries } from './data/countries';
 import { Menu, X } from 'lucide-react';
 
 const HASH_TO_PAGE: Record<string, PageView> = {
@@ -40,17 +41,44 @@ export default function App() {
   // Hash-based routing for 100% static hosting without 404s
   const getInitialPage = (): PageView => {
     if (typeof window !== 'undefined') {
-      const hash = window.location.hash.toLowerCase();
-      if (HASH_TO_PAGE[hash]) {
-        return HASH_TO_PAGE[hash];
+      const cleanHash = window.location.hash.toLowerCase().split('?')[0];
+      if (HASH_TO_PAGE[cleanHash]) {
+        return HASH_TO_PAGE[cleanHash];
       }
     }
     return 'map';
   };
 
+  // Parse shareable country selection (?c=BR,AR,CL) from URL
+  const getInitialCountryCodes = (): string[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      // 1. Check standard query params (?c=...)
+      const params = new URLSearchParams(window.location.search);
+      let cParam = params.get('c');
+
+      // 2. Also check if query params are placed inside hash (#map?c=...)
+      if (!cParam && window.location.hash.includes('?')) {
+        const hashQuery = window.location.hash.split('?')[1];
+        const hashParams = new URLSearchParams(hashQuery);
+        cParam = hashParams.get('c');
+      }
+
+      if (cParam) {
+        return cParam
+          .split(',')
+          .map((code) => countryNameToCode(code.trim()))
+          .filter(Boolean);
+      }
+    } catch (e) {
+      console.warn('Error parsing country query param from URL:', e);
+    }
+    return [];
+  };
+
   const [activePage, setActivePage] = useState<PageView>(getInitialPage);
 
-  // Initialize with the new community dataset (27 initiatives)
+  // Initialize with the community dataset
   const [initiatives, setInitiatives] = useState<Initiative[]>(STATIC_INITIATIVES);
 
   const [dataSource, setDataSource] = useState<DataSourceState>({
@@ -65,7 +93,7 @@ export default function App() {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCountry, setSelectedCountry] = useState('all');
+  const [selectedCountryCodes, setSelectedCountryCodes] = useState<string[]>(getInitialCountryCodes);
   const [selectedCategory, setSelectedCategory] = useState('all');
   
   const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null);
@@ -73,17 +101,43 @@ export default function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Listen to hash changes (browser back/forward buttons & static links)
+  // Sync selectedCountryCodes to URL query parameter (?c=BR,AR,CL) for shareable state
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.toLowerCase();
-      if (HASH_TO_PAGE[hash]) {
-        setActivePage(HASH_TO_PAGE[hash]);
+    if (typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.href);
+      if (selectedCountryCodes.length > 0) {
+        url.searchParams.set('c', selectedCountryCodes.join(','));
+      } else {
+        url.searchParams.delete('c');
       }
+      window.history.replaceState(null, '', url.toString());
+    } catch (e) {
+      console.warn('Error updating URL params:', e);
+    }
+  }, [selectedCountryCodes]);
+
+  // Listen to hash and popstate changes (browser back/forward & static links)
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const cleanHash = window.location.hash.toLowerCase().split('?')[0];
+      if (HASH_TO_PAGE[cleanHash]) {
+        setActivePage(HASH_TO_PAGE[cleanHash]);
+      }
+      // Re-read URL country param if changed
+      const codes = getInitialCountryCodes();
+      setSelectedCountryCodes((prev) => {
+        const isSame = prev.length === codes.length && prev.every((c, i) => c === codes[i]);
+        return isSame ? prev : codes;
+      });
     };
 
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
+    };
   }, []);
 
   // Update page title for static navigation and accessibility
@@ -229,14 +283,13 @@ export default function App() {
         (item.scope && item.scope.toLowerCase().includes(query)) ||
         (item.locationRaw && item.locationRaw.toLowerCase().includes(query));
 
-      const matchesCountry =
-        selectedCountry === 'all' || item.country.trim() === selectedCountry;
+      const matchesCountry = matchesSelectedCountries(item.country, selectedCountryCodes);
       const matchesCategory =
         selectedCategory === 'all' || item.category.trim() === selectedCategory;
 
       return matchesSearch && matchesCountry && matchesCategory;
     });
-  }, [initiatives, searchTerm, selectedCountry, selectedCategory]);
+  }, [initiatives, searchTerm, selectedCountryCodes, selectedCategory]);
 
   const handleSelectInitiative = (item: Initiative) => {
     setSelectedInitiative(item);
@@ -250,7 +303,7 @@ export default function App() {
 
   const handleResetFilters = () => {
     setSearchTerm('');
-    setSelectedCountry('all');
+    setSelectedCountryCodes([]);
     setSelectedCategory('all');
   };
 
@@ -288,8 +341,8 @@ export default function App() {
               onSelectInitiative={handleSelectInitiative}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              selectedCountry={selectedCountry}
-              onCountryChange={setSelectedCountry}
+              selectedCountryCodes={selectedCountryCodes}
+              onCountryCodesChange={setSelectedCountryCodes}
               selectedCategory={selectedCategory}
               onCategoryChange={setSelectedCategory}
               onResetFilters={handleResetFilters}
@@ -312,11 +365,15 @@ export default function App() {
               <InteractiveMap
                 initiatives={filteredInitiatives}
                 selectedInitiative={selectedInitiative}
+                selectedCountryCodes={selectedCountryCodes}
                 onSelectInitiative={(init) => {
                   setSelectedInitiative(init);
                   setIsDetailModalOpen(true);
                 }}
-                onResetView={() => setSelectedInitiative(null)}
+                onResetView={() => {
+                  setSelectedInitiative(null);
+                  setSelectedCountryCodes([]);
+                }}
               />
             </main>
           </>
@@ -327,8 +384,8 @@ export default function App() {
             initiatives={initiatives}
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
-            selectedCountry={selectedCountry}
-            onCountryChange={setSelectedCountry}
+            selectedCountryCodes={selectedCountryCodes}
+            onCountryCodesChange={setSelectedCountryCodes}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
             onResetFilters={handleResetFilters}
@@ -342,9 +399,13 @@ export default function App() {
 
         {activePage === 'stats' && (
           <StatsPage
-            initiatives={initiatives}
+            initiatives={filteredInitiatives}
+            allInitiatives={initiatives}
+            selectedCountryCodes={selectedCountryCodes}
+            onCountryCodesChange={setSelectedCountryCodes}
             onFilterByCountry={(country) => {
-              setSelectedCountry(country);
+              const code = countryNameToCode(country);
+              setSelectedCountryCodes([code]);
               navigateToPage('directory');
             }}
             onFilterByCategory={(cat) => {
